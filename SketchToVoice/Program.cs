@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.Textract;
+using Amazon.Textract.Model;
 
 namespace SketchToVoice
 {
@@ -28,9 +32,12 @@ namespace SketchToVoice
             await CreateS3BucketIfNotExists();
             string sketchPath = await UploadToBucket(reader);
             string text = await ReadText(sketchPath);
-            string voiceUrl = await GetVoice(text);
-        }
+            await StoreTextAsTxtInBucket(text);
+            string voiceUrl = await StoreVoiceInS3Bucket(text);
 
+            Cleanup();
+        }
+        
         private static FileStream GetFile()
         {
             return new FileStream(FileNameToLookFor, FileMode.Open, FileAccess.Read);
@@ -78,12 +85,56 @@ namespace SketchToVoice
         
         private static async Task<string> ReadText(string textUrl)
         {
+            using var client = new AmazonTextractClient();
+            
+            var document = new Document
+            {
+                S3Object = new Amazon.Textract.Model.S3Object
+                {
+                    Bucket = S3BucketName,
+                    Name = textUrl
+                }
+            };
+            var request = new DetectDocumentTextRequest
+            {
+                Document = document
+            };
+
+            var response = await client.DetectDocumentTextAsync(request);
+            return GetTextFromBlocks(response.Blocks);
+        }
+
+        private static string GetTextFromBlocks(List<Block> responseBlocks)
+        {
+            StringBuilder sb = new StringBuilder(responseBlocks.Count);
+            foreach (var block in responseBlocks)
+            {
+                sb.AppendLine(block.Text);
+            }
+
+            return sb.ToString();
+        }
+        
+        private static async Task StoreTextAsTxtInBucket(string text)
+        {
+            var request = new PutObjectRequest
+            {
+                BucketName = S3BucketName,
+                Key = $"{TextDir}/{FileNameToLookFor}.txt",
+                ContentBody = text
+            };
+
+            await _s3Client.PutObjectAsync(request);
+        }
+
+        private static async Task<string> StoreVoiceInS3Bucket(string text)
+        {
             throw new NotImplementedException();
         }
         
-        private static async Task<string> GetVoice(string text)
+        private static void Cleanup()
         {
-            throw new NotImplementedException();
+            _s3Client.Dispose();
         }
     }
 }
