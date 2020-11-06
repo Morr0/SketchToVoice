@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="AWSSDK.Core" Version="3.5.1.34" />
+      <PackageReference Include="AWSSDK.Polly" Version="3.5.0.36" />
+      <PackageReference Include="AWSSDK.S3" Version="3.5.3.12" />
+      <PackageReference Include="AWSSDK.Textract" Version="3.5.1.17" />
+    </ItemGroup>
+
+</Project>
