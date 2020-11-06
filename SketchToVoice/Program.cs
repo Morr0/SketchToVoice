@@ -39,12 +39,18 @@ namespace SketchToVoice
         private static async Task CreateS3BucketIfNotExists()
         {
             var bucketsResponse = await _s3Client.ListBucketsAsync(new ListBucketsRequest());
-            
-            var bucket = new S3Bucket
+
+            bool bucketExists = false;
+            foreach (var bucket in bucketsResponse.Buckets)
             {
-                BucketName = S3BucketName
-            };
-            if (!bucketsResponse.Buckets.Contains(bucket))
+                if (bucket.BucketName == S3BucketName)
+                {
+                    bucketExists = true;
+                    break;
+                }
+            }
+
+            if (!bucketExists)
             {
                 var request = new PutBucketRequest
                 {
