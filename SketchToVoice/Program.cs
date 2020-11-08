@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.Polly;
+using Amazon.Polly.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.Textract;
@@ -12,12 +13,11 @@ namespace SketchToVoice
 {
     class Program
     {
-        public const string FileNameToLookFor = "sample.png";
-        
-        public const string S3BucketName = "project-sketch-to-voice";
-        public const string SketchDir = "sketch";
-        public const string TextDir = "text";
-        public const string AudioDir = "audio";
+        private const string FileNameToLookFor = "sample.png";
+
+        private const string S3BucketName = "project-sketch-to-voice";
+        private const string SketchDir = "sketch";
+        private const string TextDir = "text";
 
         private static AmazonS3Client _s3Client;
 
@@ -33,7 +33,8 @@ namespace SketchToVoice
             string sketchPath = await UploadToBucket(reader);
             string text = await ReadText(sketchPath);
             await StoreTextAsTxtInBucket(text);
-            string voiceUrl = await StoreVoiceInS3Bucket(text);
+            Stream stream = await GetVoice(text);
+            await PutVoiceOnDisk(stream);
 
             Cleanup();
         }
@@ -127,11 +128,33 @@ namespace SketchToVoice
             await _s3Client.PutObjectAsync(request);
         }
 
-        private static async Task<string> StoreVoiceInS3Bucket(string text)
+        private static async Task<Stream> GetVoice(string text)
         {
-            throw new NotImplementedException();
+            var client = new AmazonPollyClient();
+            
+            var request = new SynthesizeSpeechRequest
+            {
+                Text = text,
+                LanguageCode = LanguageCode.EnAU,
+                TextType = TextType.Text,
+                VoiceId = VoiceId.Aditi,
+                OutputFormat = OutputFormat.Mp3,
+            };
+
+            return (await client.SynthesizeSpeechAsync(request)).AudioStream;
         }
         
+        private static async Task<string> PutVoiceOnDisk(Stream stream)
+        {
+            string filename = $"{FileNameToLookFor}.mp3";
+            var writer = new FileStream(filename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+            
+            await stream.CopyToAsync(writer);
+            await writer.FlushAsync();
+
+            return filename;
+        }
+
         private static void Cleanup()
         {
             _s3Client.Dispose();
